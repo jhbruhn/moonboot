@@ -15,5 +15,4 @@ keywords = ["embedded", "no_std", "bootloader", "framework", "fota"]
 moonboot = { path = "../", version = "0.1.1" }
 
 [package.metadata.release]
-tag = false
 shared-version = true
