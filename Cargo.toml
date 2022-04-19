@@ -38,6 +38,7 @@ defmt-warn = []
 defmt-error = []
 
 [package.metadata.release]
+enable-features = ["ram-state", "ram-state", "cortex-m"]
 shared-version = true
 pre-release-replacements = [
   {file="CHANGELOG.md", search="Unreleased", replace="{{version}}"},
