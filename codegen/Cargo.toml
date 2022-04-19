@@ -12,7 +12,7 @@ keywords = ["embedded", "no_std", "bootloader", "framework", "fota"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-moonboot = { path = "../", version = "0.1.0" }
+moonboot = { path = "../", version = "0.1.1" }
 
 [package.metadata.release]
 tag = false
