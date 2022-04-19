@@ -239,14 +239,14 @@ dependencies = [
 
 [[package]]
 name = "moonboot-codegen"
-version = "0.1.0-dev"
+version = "0.1.0"
 dependencies = [
  "moonboot",
 ]
 
 [[package]]
 name = "moonboot-macros"
-version = "0.1.0-dev"
+version = "0.1.0"
 dependencies = [
  "proc-macro-error",
  "quote 1.0.18",
