@@ -11,7 +11,7 @@ keywords = ["embedded", "no_std", "bootloader", "framework", "fota"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-moonboot-macros = { path = "./macros", version = "0.1.1" }
+moonboot-macros = { path = "./macros", version = "0.1.2" }
 heapless = {version = "0.7", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"], default-features = false, optional = true }
 cortex-m = { version = "0.7", optional = true }
