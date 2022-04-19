@@ -16,3 +16,4 @@ moonboot = { path = "../", version = "0.1.1" }
 
 [package.metadata.release]
 shared-version = true
+dependent-version = "upgrade"

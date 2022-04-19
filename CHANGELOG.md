@@ -3,6 +3,7 @@
 ## [Unreleased] - ReleaseDate
 
 - Enable more features in build
+- Fix automatic releases
 
 ## [0.1.0]
 
