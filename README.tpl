@@ -1,13 +1,6 @@
-# moonboot
+# {{crate}}
 
-Moonboot is a framework to build bootloaders for embedded devices, or other kinds of no_std
-Rust environments.
-
-This crate contains implementations, macros and build.rs helpers for:
-* Partitioning of your memory into different sections
-* Exchange of the contents of those partitions via the bootloader
-* Signature-checking of the partitions contents with an algorithm of your choice
-* Automatic Linker Script generation based on a Section/Parition Description in Rust Code
+{{readme}}
 
 ## License
 

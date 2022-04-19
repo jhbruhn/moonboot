@@ -1,20 +1,35 @@
 #![no_std]
 
+//!Moonboot is a framework to build bootloaders for embedded devices, or other kinds of no_std
+//!Rust environments.
+//!
+//!This crate contains implementations, macros and build.rs helpers for:
+//!* Partitioning of your memory into different sections
+//!* Exchange of the contents of those partitions via the bootloader
+//!* Signature-checking of the partitions contents with an algorithm of your choice
+//!* Automatic Linker Script generation based on a Section/Parition Description in Rust Code
+
+/// Implementations for use in the bootloader
 pub mod boot;
+/// Common hardware abstractions and associated implementations
 pub mod hardware;
+/// Implementations for use in the firmware
 pub mod manager;
+/// Shared state management between firmware and bootloader
 pub mod state;
 
-pub use embedded_storage; // TODO
+pub use embedded_storage;
 
 /// Because most of the time, ...
 pub use boot as left_boot;
 /// ... there's two boots involved.
 pub use manager as right_boot;
 
-// Address type in RAM or ROM
+/// Address type in RAM or ROM
 pub type Address = u32;
 
+/// Marker macro for a handler fn invoked shortly before jumping to a different image. Use this to
+/// uninitialize your hardware.
 pub use moonboot_macros::pre_jump_handler;
 
 #[cfg(feature = "use-defmt")]
