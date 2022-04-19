@@ -1,4 +1,4 @@
-use moonboots::{
+use moonboot::{
     hardware::{Config, LinkerConfig},
     state::{StateCrcType, STATE_SERIALIZED_MAX_SIZE},
     Address,
