@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Jan-Henrik Bruhn <rust@jhbruhn.de>"]
 repository = "https://github.com/jhbruhn/moonboot"
-keywords = ["embedded", "no_std", "bootloader", "framework", "ota", "fota", "updater"]
+keywords = ["embedded", "no_std", "bootloader", "framework", "fota"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

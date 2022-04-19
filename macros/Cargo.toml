@@ -6,7 +6,7 @@ version = "0.1.0"
 license = "MIT OR Apache-2.0"
 authors = ["Jan-Henrik Bruhn <rust@jhbruhn.de>"]
 repository = "https://github.com/jhbruhn/moonboot"
-keywords = ["embedded", "no_std", "bootloader", "framework", "ota", "fota", "updater"]
+keywords = ["embedded", "no_std", "bootloader", "framework", "fota"]
 
 [lib]
 proc-macro = true
