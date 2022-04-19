@@ -18,3 +18,4 @@ syn = { version = "1.0", features = ["full"] }
 
 [package.metadata.release]
 tag = false
+shared-version = true
