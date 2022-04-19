@@ -67,7 +67,7 @@ impl<
     /// Execute the update and boot logic of the bootloader
     pub fn boot(&mut self) -> Result<void::Void, ()> {
         // TODO: consider error handling
-        log::info!("Booting with moonshine!");
+        log::info!("Booting with moonboot!");
 
         self.processor.setup(&self.config);
 

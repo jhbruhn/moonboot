@@ -23,12 +23,12 @@ fn generate_linker_script(
     MEMORY {{
         FLASH : ORIGIN = 0x{flash_origin:08x}, LENGTH = {flash_length}
         RAM : ORIGIN = 0x{ram_origin:08x}, LENGTH = {ram_length}
-        MOONSHINE_STATE: ORIGIN = 0x{state_origin:08x}, LENGTH = {state_section_length}
+        MOONBOOT_STATE: ORIGIN = 0x{state_origin:08x}, LENGTH = {state_section_length}
     }}
 
-    _moonshine_state_crc_start = ORIGIN(MOONSHINE_STATE);
-    _moonshine_state_len_start = ORIGIN(MOONSHINE_STATE) + {crc_length};
-    _moonshine_state_data_start = ORIGIN(MOONSHINE_STATE) + {crc_length} + {data_len_length};
+    _moonboot_state_crc_start = ORIGIN(MOONBOOT_STATE);
+    _moonboot_state_len_start = ORIGIN(MOONBOOT_STATE) + {crc_length};
+    _moonboot_state_data_start = ORIGIN(MOONBOOT_STATE) + {crc_length} + {data_len_length};
     PROVIDE(_moonboots_pre_jump = __moonboots_default_pre_jump);
 ",
             flash_origin = flash_origin,
