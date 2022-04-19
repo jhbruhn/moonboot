@@ -1,0 +1,14 @@
+[package]
+authors = ["Jan-Henrik Bruhn <hi@jhbruhn.de>"]
+description = "moonboot macros"
+edition = "2018"
+name = "moonboot-macros"
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro-error = "1.0"
+quote = "1.0"
+syn = { version = "1.0", features = ["full"] }

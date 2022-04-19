@@ -1,0 +1,39 @@
+[package]
+name = "moonboot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+moonboot-macros = { path = "./macros" }
+heapless = {version = "0.7", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"], default-features = false, optional = true }
+cortex-m = { version = "0.7", optional = true }
+defmt = { version = "0.2", optional = true }
+logger-crate = { version = "0.4", optional = true, package = "log" }
+crc = "2.0"
+desse = { version = "0.2.1", optional = true }
+void = { version = "1.0", default-features = false }
+embedded-storage = "0.2"
+
+
+[features]
+default = ["ram-state"]
+use-log = ["logger-crate"]
+use-defmt = ["defmt"]
+ram-state = ["desse"]
+derive = ["serde"]
+
+defmt-default = []
+defmt-trace = []
+defmt-debug = []
+defmt-info = []
+defmt-warn = []
+defmt-error = []
+
+[workspace]
+members = [
+    ".",
+    "codegen",
+]
