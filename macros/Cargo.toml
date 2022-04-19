@@ -2,7 +2,7 @@
 description = "Macros for moonboot bootloader framework"
 edition = "2021"
 name = "moonboot-macros"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT OR Apache-2.0"
 authors = ["Jan-Henrik Bruhn <rust@jhbruhn.de>"]
 repository = "https://github.com/jhbruhn/moonboot"
