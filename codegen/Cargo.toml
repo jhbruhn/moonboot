@@ -13,3 +13,6 @@ keywords = ["embedded", "no_std", "bootloader", "framework", "ota", "fota", "upd
 
 [dependencies]
 moonboot = { path = "../", version = "0.1.0-dev" }
+
+[package.metadata.release]
+tag = false

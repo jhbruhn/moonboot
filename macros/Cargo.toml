@@ -15,3 +15,6 @@ proc-macro = true
 proc-macro-error = "1.0"
 quote = "1.0"
 syn = { version = "1.0", features = ["full"] }
+
+[package.metadata.release]
+tag = false
