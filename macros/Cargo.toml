@@ -3,7 +3,7 @@ authors = ["Jan-Henrik Bruhn <hi@jhbruhn.de>"]
 description = "moonboot macros"
 edition = "2018"
 name = "moonboot-macros"
-version = "0.1.0"
+version = "0.1.0-dev"
 
 [lib]
 proc-macro = true
