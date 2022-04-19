@@ -9,7 +9,7 @@ use crate::log;
 
 /// Instantiate this in your application to enable mutation of the State specified in this and jump
 /// to the bootloader to apply any updates.
-pub struct MoonshineManager<
+pub struct MoonbootManager<
     InternalMemory: Storage,
     HardwareState: State,
     CPU: Processor,
@@ -26,14 +26,14 @@ impl<
         HardwareState: State,
         CPU: Processor,
         const INTERNAL_PAGE_SIZE: usize,
-    > MoonshineManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
+    > MoonbootManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
 {
     pub fn new(
         config: Config,
         internal_memory: InternalMemory,
         state: HardwareState,
         processor: CPU,
-    ) -> MoonshineManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE> {
+    ) -> MoonbootManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE> {
         Self {
             config,
             internal_memory,
@@ -125,13 +125,14 @@ impl<
     }
 }
 
+/// Easily get read access to the update bank
 impl<
         InternalMemory: Storage,
         HardwareState: State,
         CPU: Processor,
         const INTERNAL_PAGE_SIZE: usize,
     > core::convert::AsRef<[u8]>
-    for MoonshineManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
+    for MoonbootManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
 {
     #[inline]
     fn as_ref(&self) -> &[u8] {
@@ -150,7 +151,7 @@ impl<
         HardwareState: State,
         CPU: Processor,
         const INTERNAL_PAGE_SIZE: usize,
-    > ReadStorage for MoonshineManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
+    > ReadStorage for MoonbootManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
 {
     type Error = (); // TODO
 
@@ -181,7 +182,7 @@ impl<
         HardwareState: State,
         CPU: Processor,
         const INTERNAL_PAGE_SIZE: usize,
-    > Storage for MoonshineManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
+    > Storage for MoonbootManager<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
 {
     fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
         let bank = self.config.update_bank; // For now we always write updates to this bank.

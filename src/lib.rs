@@ -6,24 +6,29 @@
 //!This crate contains implementations, macros and build.rs helpers for:
 //!* Partitioning of your memory into different sections
 //!* Exchange of the contents of those partitions via the bootloader
-//!* Signature-checking of the partitions contents with an algorithm of your choice
+//!* Signature/Checksum-checking of the partitions contents with an algorithm of your choice, because it is
+//!done in firmware, not in bootloader
 //!* Automatic Linker Script generation based on a Section/Parition Description in Rust Code
 
+mod boot;
 /// Implementations for use in the bootloader
-pub mod boot;
+pub use boot::MoonbootBoot;
+
+mod manager;
+/// Implementations for use in the firmware
+pub use manager::MoonbootManager;
+
 /// Common hardware abstractions and associated implementations
 pub mod hardware;
-/// Implementations for use in the firmware
-pub mod manager;
 /// Shared state management between firmware and bootloader
 pub mod state;
 
 pub use embedded_storage;
 
-/// Because most of the time, ...
-pub use boot as left_boot;
-/// ... there's two boots involved.
-pub use manager as right_boot;
+// Because most of the time, ...
+//pub use boot::MoonbootBoot as LeftBoot;
+// ... there's two boots involved.
+//pub use manager::MoonbootManager as RightBoot;
 
 /// Address type in RAM or ROM
 pub type Address = u32;

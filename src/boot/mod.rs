@@ -11,6 +11,9 @@ use crate::log;
 
 #[cfg(feature = "defmt")]
 use defmt::Format;
+
+
+/// Error occured during nemory access
 #[cfg_attr(feature = "use-defmt", derive(Format))]
 #[derive(Debug)]
 enum MemoryError {
@@ -22,7 +25,7 @@ enum MemoryError {
 
 /// Use this from your bootloader application and call boot() to do the magic, reading the current
 /// state via the State type and then jumping to the new image using the Jumper specified
-pub struct MoonshineBoot<
+pub struct MoonbootBoot<
     InternalMemory: Storage,
     HardwareState: State,
     CPU: Processor, // TODO: Wrap these into a context struct like rubble?
@@ -39,7 +42,7 @@ impl<
         HardwareState: State,
         CPU: Processor,
         const INTERNAL_PAGE_SIZE: usize,
-    > MoonshineBoot<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
+    > MoonbootBoot<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
 {
     /// create a new instance of the bootloader
     pub fn new(
@@ -47,7 +50,7 @@ impl<
         internal_memory: InternalMemory,
         state: HardwareState,
         processor: CPU,
-    ) -> MoonshineBoot<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE> {
+    ) -> MoonbootBoot<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE> {
         Self {
             config,
             internal_memory,

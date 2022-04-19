@@ -9,7 +9,7 @@ use desse::{Desse, DesseSized};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-// Decision making for the bootloader
+/// Decision making states for the bootloader
 // TODO: Hash + Signature? Should be done on download I think! This way, the algorithms can be
 // exchanged via software updates easily
 #[cfg_attr(feature = "use-defmt", derive(Format))]
@@ -35,54 +35,61 @@ pub enum Update {
 #[cfg_attr(feature = "derive", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "ram-state", derive(Desse, DesseSized))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// Errors that can occur during update
+/// Errors that can occur during update
 pub enum UpdateError {
-    // A wrong Image Index has been specified
+    /// A wrong Image Index has been specified
     InvalidImageIndex,
-    // Failed to exchange the new image with the old one
+    /// Failed to exchange the new image with the old one
     ImageExchangeFailed,
-    // Something f'ed up the internal state
+    /// Something f'ed up the internal state
     InvalidState,
-    // The Signature provided does not match the PublicKey or Image.
+    /// The Signature provided does not match the PublicKey or Image.
     InvalidSignature,
 }
 
-// Store the progress of the current exchange operation
+/// Store the progress of the current exchange operation
 #[cfg_attr(feature = "use-defmt", derive(Format))]
 #[cfg_attr(feature = "derive", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "ram-state", derive(Desse, DesseSized))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExchangeProgress {
-    // Bank the update is coming from
+    /// Bank the update is coming from
     pub(crate) a: Bank,
-    // Bank the update is going to
+    /// Bank the update is going to
     pub(crate) b: Bank,
-    // Page the operation has last copied
+    /// Page the operation has last copied
     pub(crate) page_index: u32,
-    // Whether this exchange resulted from a Request (false) or a Revert (true)
+    /// Whether this exchange resulted from a Request (false) or a Revert (true)
     pub(crate) recovering: bool,
 }
 
-// Struct used to store the state of the bootloader situation in NVM
+/// Struct used to store the state of the bootloader situation in NVM
 #[cfg_attr(feature = "use-defmt", derive(Format))]
 #[cfg_attr(feature = "derive", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "ram-state", derive(Desse, DesseSized))]
 #[derive(Debug)]
-pub struct MoonshineState {
-    // If set Request, an Update is requested. This will exchange the two images, set the update
-    // state to Revert and start the application. The application then has to set this state to
-    // None and store it. If something went wrong and the boot attempt results in a restart of
-    // the bootloader, the bootloader starts with this variable set to Revert and thus exchanges
-    // the two images again, doing a downgrade because of a failed boot
+pub struct MoonbootState {
+    /// If set Request, an Update is requested. This will exchange the two images, set the update
+    /// state to Revert and start the application. The application then has to set this state to
+    /// None and store it. If something went wrong and the boot attempt results in a restart of
+    /// the bootloader, the bootloader starts with this variable set to Revert and thus exchanges
+    /// the two images again, doing a downgrade because of a failed boot
     pub update: Update,
 }
 
+/// Hardware abstraction for the state storage. Can for example be stored on a flash bank, or in
+/// RAM. As long as you don't want to perform update download, power cycle the device, and then
+/// apply the update, storing it in volatile memory is fine.
 pub trait State {
-    fn read(&mut self) -> MoonshineState;
-    fn write(&mut self, data: MoonshineState) -> Result<(), ()>;
+    /// Read the shared state
+    fn read(&mut self) -> MoonbootState;
+    /// Write the new state to the shared state
+    fn write(&mut self, data: MoonbootState) -> Result<(), ()>;
 }
 
-pub const STATE_SERIALIZED_MAX_SIZE: usize = MoonshineState::SIZE;
+/// Size of the serialized state
+pub const STATE_SERIALIZED_MAX_SIZE: usize = MoonbootState::SIZE;
+/// Type used to store the shared state CRC
 pub type StateCrcType = u32;
 const CRC: Crc<StateCrcType> = Crc::<StateCrcType>::new(&CRC_32_CKSUM);
 
@@ -101,14 +108,14 @@ pub mod ram {
     pub struct RamState;
 
     extern "C" {
-        static mut _moonshine_state_crc_start: StateCrcType;
-        static mut _moonshine_state_data_start: [u8; STATE_SERIALIZED_MAX_SIZE];
+        static mut _moonboot_state_crc_start: StateCrcType;
+        static mut _moonboot_state_data_start: [u8; STATE_SERIALIZED_MAX_SIZE];
         // TODO: Move these as normal variables to linker sections via #[link] macro?
     }
 
     impl State for RamState {
-        fn read(&mut self) -> MoonshineState {
-            let crc = unsafe { _moonshine_state_crc_start };
+        fn read(&mut self) -> MoonbootState {
+            let crc = unsafe { _moonboot_state_crc_start };
 
             log::info!(
                 "Reading data with len: {}, CRC: {}",
@@ -116,36 +123,36 @@ pub mod ram {
                 crc
             );
 
-            let checksum = checksum(unsafe { &_moonshine_state_data_start });
+            let checksum = checksum(unsafe { &_moonboot_state_data_start });
             if crc == checksum {
                 let data =
-                    MoonshineState::deserialize_from(unsafe { &_moonshine_state_data_start });
+                    MoonbootState::deserialize_from(unsafe { &_moonboot_state_data_start });
                 log::trace!("CRC Match! {}: {:?}", crc, data);
                 return data;
             } else {
                 log::trace!("CRC Mismatch! {} vs {}", crc, checksum);
             }
 
-            MoonshineState {
+            MoonbootState {
                 update: Update::None,
             }
         }
 
-        fn write(&mut self, data: MoonshineState) -> Result<(), ()> {
+        fn write(&mut self, data: MoonbootState) -> Result<(), ()> {
             log::trace!("Writing data {:?}", data);
 
-            unsafe { _moonshine_state_data_start = data.serialize() };
+            unsafe { _moonboot_state_data_start = data.serialize() };
             log::trace!("Written data: {:?}", unsafe {
-                &_moonshine_state_data_start
+                &_moonboot_state_data_start
             });
 
             unsafe {
-                _moonshine_state_crc_start = checksum(&_moonshine_state_data_start);
+                _moonboot_state_crc_start = checksum(&_moonboot_state_data_start);
             }
             log::info!(
                 "Written len: {}, checksum: {}",
                 STATE_SERIALIZED_MAX_SIZE,
-                unsafe { _moonshine_state_crc_start }
+                unsafe { _moonboot_state_crc_start }
             );
 
             Ok(())
