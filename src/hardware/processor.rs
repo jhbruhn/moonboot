@@ -13,7 +13,7 @@ pub trait Processor {
 
 /// Implementation of a processor based on the cortex-m crate
 #[cfg(feature = "cortex-m")]
-mod cortex_m {
+pub mod cortex_m {
     use super::Processor;
     /// cortex-m based [Processor]
     pub struct CortexM {}
@@ -41,6 +41,3 @@ mod cortex_m {
     }
 }
 
-#[cfg(feature = "cortex-m")]
-/// A Jumper implementation for use with cortex-m processors
-pub use cortex_m::CortexM;
