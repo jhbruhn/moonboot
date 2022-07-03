@@ -47,6 +47,20 @@ pub enum UpdateError {
     InvalidSignature,
 }
 
+/// Upcoming operation of the exchange process for a given page index.
+#[cfg_attr(feature = "use-defmt", derive(Format))]
+#[cfg_attr(feature = "derive", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "ram-state", derive(Desse, DesseSized))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExchangeStep {
+    /// Copy page A to the scratch page.
+    AToScratch,
+    /// Copy page B to page A.
+    BToA,
+    /// Copy the scratch page to page B.
+    ScratchToB,
+}
+
 /// Store the progress of the current exchange operation
 #[cfg_attr(feature = "use-defmt", derive(Format))]
 #[cfg_attr(feature = "derive", derive(Serialize, Deserialize))]
@@ -59,6 +73,8 @@ pub struct ExchangeProgress {
     pub(crate) b: Bank,
     /// Page the operation has last copied
     pub(crate) page_index: u32,
+    /// Upcoming operation of the exchange process for a given page index.
+    pub(crate) step: ExchangeStep,
     /// Whether this exchange resulted from a Request (false) or a Revert (true)
     pub(crate) recovering: bool,
 }
@@ -84,7 +100,7 @@ pub trait State {
     /// Read the shared state
     fn read(&mut self) -> MoonbootState;
     /// Write the new state to the shared state
-    fn write(&mut self, data: MoonbootState) -> Result<(), ()>;
+    fn write(&mut self, data: &MoonbootState) -> Result<(), ()>;
 }
 
 /// Size of the serialized state
@@ -125,8 +141,7 @@ pub mod ram {
 
             let checksum = checksum(unsafe { &_moonboot_state_data_start });
             if crc == checksum {
-                let data =
-                    MoonbootState::deserialize_from(unsafe { &_moonboot_state_data_start });
+                let data = MoonbootState::deserialize_from(unsafe { &_moonboot_state_data_start });
                 log::trace!("CRC Match! {}: {:?}", crc, data);
                 return data;
             } else {
@@ -138,13 +153,11 @@ pub mod ram {
             }
         }
 
-        fn write(&mut self, data: MoonbootState) -> Result<(), ()> {
+        fn write(&mut self, data: &MoonbootState) -> Result<(), ()> {
             log::trace!("Writing data {:?}", data);
 
             unsafe { _moonboot_state_data_start = data.serialize() };
-            log::trace!("Written data: {:?}", unsafe {
-                &_moonboot_state_data_start
-            });
+            log::trace!("Written data: {:?}", unsafe { &_moonboot_state_data_start });
 
             unsafe {
                 _moonboot_state_crc_start = checksum(&_moonboot_state_data_start);

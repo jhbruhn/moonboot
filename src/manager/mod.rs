@@ -75,7 +75,7 @@ impl<
 
         log::trace!("New state: {:?}", current_state);
 
-        self.state.write(current_state)
+        self.state.write(&current_state)
     }
 
     // Upgrade firmware verifiying the given signature over the size of size.
@@ -107,7 +107,7 @@ impl<
 
         current_state.update = Update::Request(bank);
 
-        self.state.write(current_state)?;
+        self.state.write(&current_state)?;
 
         log::info!("Stored update request, jumping to bootloader! Geronimo!");
 

@@ -11,10 +11,12 @@
 //!* Automatic Linker Script generation based on a Section/Parition Description in Rust Code
 
 mod boot;
+
 /// Implementations for use in the bootloader
 pub use boot::MoonbootBoot;
 
 mod manager;
+
 /// Implementations for use in the firmware
 pub use manager::MoonbootManager;
 
@@ -22,6 +24,8 @@ pub use manager::MoonbootManager;
 pub mod hardware;
 /// Shared state management between firmware and bootloader
 pub mod state;
+/// Abstractions on the method of flash page swapping.
+pub mod swap;
 
 pub use embedded_storage;
 
