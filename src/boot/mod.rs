@@ -1,8 +1,7 @@
 use crate::{
     hardware::processor::Processor,
     hardware::{Bank, Config},
-    state::{ExchangeProgress, ExchangeStep, State, Update, UpdateError},
-    swap::{MemoryError, Swap},
+    state::{Exchange, ExchangeProgress, ExchangeStep, MemoryError, State, Update, UpdateError},
 };
 
 use embedded_storage::Storage;
@@ -15,47 +14,47 @@ use defmt::Format;
 /// Use this from your bootloader application and call boot() to do the magic, reading the current
 /// state via the State type and then jumping to the new image using the Jumper specified
 pub struct MoonbootBoot<
-    InternalMemory: Storage,
-    HardwareState: State,
-    CPU: Processor, // TODO: Wrap these into a context struct like rubble?
-    PageSwap: Swap,
+    STORAGE: Storage,
+    STATE: State,
+    PROCESSOR: Processor, // TODO: Wrap these into a context struct like rubble?
+    EXCHANGE: Exchange,
     const INTERNAL_PAGE_SIZE: usize,
 > {
     config: Config,
-    internal_memory: InternalMemory,
-    state: HardwareState,
-    processor: CPU,
-    swap: PageSwap,
+    storage: STORAGE,
+    state: STATE,
+    processor: PROCESSOR,
+    exchange: EXCHANGE,
 }
 
 impl<
-        InternalMemory: Storage,
-        HardwareState: State,
-        CPU: Processor,
-        PageSwap: Swap,
+        STORAGE: Storage,
+        STATE: State,
+        PROCESSOR: Processor,
+        EXCHANGE: Exchange,
         const INTERNAL_PAGE_SIZE: usize,
-    > MoonbootBoot<InternalMemory, HardwareState, CPU, PageSwap, INTERNAL_PAGE_SIZE>
+    > MoonbootBoot<STORAGE, STATE, PROCESSOR, EXCHANGE, INTERNAL_PAGE_SIZE>
 {
     /// create a new instance of the bootloader
     pub fn new(
         config: Config,
-        internal_memory: InternalMemory,
-        state: HardwareState,
-        processor: CPU,
-        swap: PageSwap,
-    ) -> MoonbootBoot<InternalMemory, HardwareState, CPU, PageSwap, INTERNAL_PAGE_SIZE> {
+        storage: STORAGE,
+        state: STATE,
+        processor: PROCESSOR,
+        exchange: EXCHANGE,
+    ) -> MoonbootBoot<STORAGE, STATE, PROCESSOR, EXCHANGE, INTERNAL_PAGE_SIZE> {
         Self {
             config,
-            internal_memory,
+            storage,
             state,
             processor,
-            swap,
+            exchange,
         }
     }
 
     /// Destroy this instance of the bootloader and return access to the hardware peripheral
-    pub fn destroy(self) -> (InternalMemory, HardwareState, CPU) {
-        (self.internal_memory, self.state, self.processor)
+    pub fn destroy(self) -> (STORAGE, STATE, PROCESSOR) {
+        (self.storage, self.state, self.processor)
     }
 
     /// Execute the update and boot logic of the bootloader
@@ -124,9 +123,9 @@ impl<
         );
 
         let exchange_result = self
-            .swap
-            .exchange::<InternalMemory, HardwareState, INTERNAL_PAGE_SIZE>(
-                &mut self.internal_memory,
+            .exchange
+            .exchange::<STORAGE, STATE, INTERNAL_PAGE_SIZE>(
+                &mut self.storage,
                 &mut self.state,
                 progress,
             );
@@ -165,7 +164,7 @@ impl<
                 old.location,
                 old.size / 1024,
                 new.location,
-                new.size / 1024,
+                new.size / 1024
             );
 
             // Try to exchange the firmware images
@@ -195,9 +194,9 @@ impl<
     }
 
     fn exchange_banks(&mut self, a: Bank, b: Bank) -> Result<(), MemoryError> {
-        self.swap
-            .exchange::<InternalMemory, HardwareState, INTERNAL_PAGE_SIZE>(
-                &mut self.internal_memory,
+        self.exchange
+            .exchange::<STORAGE, STATE, INTERNAL_PAGE_SIZE>(
+                &mut self.storage,
                 &mut self.state,
                 ExchangeProgress {
                     a,

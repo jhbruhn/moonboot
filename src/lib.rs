@@ -24,8 +24,6 @@ pub use manager::MoonbootManager;
 pub mod hardware;
 /// Shared state management between firmware and bootloader
 pub mod state;
-/// Abstractions on the method of flash page swapping.
-pub mod swap;
 
 pub use embedded_storage;
 

@@ -29,7 +29,7 @@ pub mod cortex_m {
         fn do_jump(&mut self, address: super::Address) -> ! {
             unsafe {
                 // Set Vector Table to new vector table (unsafe but okay here)
-                (*cortex_m::peripheral::SCB::ptr()).vtor.write(address);
+                (*cortex_m::peripheral::SCB::PTR).vtor.write(address);
 
                 cortex_m::asm::bootload(address as *const u32);
             }
@@ -40,4 +40,3 @@ pub mod cortex_m {
         }
     }
 }
-

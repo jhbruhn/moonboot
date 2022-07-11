@@ -1,15 +1,63 @@
 use embedded_storage::Storage;
 
-use crate::{
-    log,
-    state::{ExchangeProgress, State, Update},
-    swap::{MemoryError, Swap},
-    Address,
-};
+use crate::{log, Address};
 
-pub struct Ram;
+use super::*;
 
-impl Swap for Ram {
+/// State read and written to RAM. This assumes the device is never powered off / the ram is never
+/// reset!
+pub struct RamState;
+
+extern "C" {
+    static mut _moonboot_state_crc_start: StateCrcType;
+    static mut _moonboot_state_data_start: [u8; STATE_SERIALIZED_MAX_SIZE];
+    // TODO: Move these as normal variables to linker sections via #[link] macro?
+}
+
+impl State for RamState {
+    fn read(&mut self) -> MoonbootState {
+        let crc = unsafe { _moonboot_state_crc_start };
+
+        log::info!(
+            "Reading data with len: {}, CRC: {}",
+            STATE_SERIALIZED_MAX_SIZE,
+            crc
+        );
+
+        let checksum = checksum(unsafe { &_moonboot_state_data_start });
+        if crc == checksum {
+            let data = MoonbootState::deserialize_from(unsafe { &_moonboot_state_data_start });
+            log::trace!("CRC Match! {}: {:?}", crc, data);
+            return data;
+        } else {
+            log::trace!("CRC Mismatch! {} vs {}", crc, checksum);
+        }
+
+        MoonbootState {
+            update: Update::None,
+        }
+    }
+
+    fn write(&mut self, data: &MoonbootState) -> Result<(), ()> {
+        log::trace!("Writing data {:?}", data);
+
+        unsafe { _moonboot_state_data_start = data.serialize() };
+        log::trace!("Written data: {:?}", unsafe { &_moonboot_state_data_start });
+
+        unsafe {
+            _moonboot_state_crc_start = checksum(&_moonboot_state_data_start);
+        }
+        log::info!(
+            "Written len: {}, checksum: {}",
+            STATE_SERIALIZED_MAX_SIZE,
+            unsafe { _moonboot_state_crc_start }
+        );
+
+        Ok(())
+    }
+}
+
+impl Exchange for RamState {
     fn exchange<InternalMemory: Storage, HardwareState: State, const INTERNAL_PAGE_SIZE: usize>(
         &mut self,
         internal_memory: &mut InternalMemory,
