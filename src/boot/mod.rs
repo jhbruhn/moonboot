@@ -1,10 +1,9 @@
 use crate::{
     hardware::processor::Processor,
     hardware::{Bank, Config},
-    state::{Exchange, ExchangeError, ExchangeProgress, ExchangeStep, State, Update, UpdateError},
+    state::{Exchange, ExchangeProgress, ExchangeStep, State, Update, UpdateError},
+    Context,
 };
-
-use embedded_storage::Storage;
 
 use crate::log;
 
@@ -13,36 +12,23 @@ use defmt::Format;
 
 /// Use this from your bootloader application and call boot() to do the magic, reading the current
 /// state via the State type and then jumping to the new image using the Jumper specified
-pub struct MoonbootBoot<
-    STORAGE: Storage,
-    STATE: State,
-    PROCESSOR: Processor, // TODO: Wrap these into a context struct like rubble?
-    EXCHANGE: Exchange,
-    const INTERNAL_PAGE_SIZE: usize,
-> {
+pub struct MoonbootBoot<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> {
     config: Config,
-    storage: STORAGE,
-    state: STATE,
-    processor: PROCESSOR,
-    exchange: EXCHANGE,
+    storage: CONTEXT::Storage,
+    state: CONTEXT::State,
+    processor: CONTEXT::Processor,
+    exchange: CONTEXT::Exchange,
 }
 
-impl<
-        STORAGE: Storage,
-        STATE: State,
-        PROCESSOR: Processor,
-        EXCHANGE: Exchange,
-        const INTERNAL_PAGE_SIZE: usize,
-    > MoonbootBoot<STORAGE, STATE, PROCESSOR, EXCHANGE, INTERNAL_PAGE_SIZE>
-{
+impl<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> MoonbootBoot<CONTEXT, INTERNAL_PAGE_SIZE> {
     /// create a new instance of the bootloader
     pub fn new(
         config: Config,
-        storage: STORAGE,
-        state: STATE,
-        processor: PROCESSOR,
-        exchange: EXCHANGE,
-    ) -> MoonbootBoot<STORAGE, STATE, PROCESSOR, EXCHANGE, INTERNAL_PAGE_SIZE> {
+        storage: CONTEXT::Storage,
+        state: CONTEXT::State,
+        processor: CONTEXT::Processor,
+        exchange: CONTEXT::Exchange,
+    ) -> Self {
         Self {
             config,
             storage,
@@ -53,12 +39,12 @@ impl<
     }
 
     /// Destroy this instance of the bootloader and return access to the hardware peripheral
-    pub fn destroy(self) -> (STORAGE, STATE, PROCESSOR) {
+    pub fn destroy(self) -> (CONTEXT::Storage, CONTEXT::State, CONTEXT::Processor) {
         (self.storage, self.state, self.processor)
     }
 
     /// Execute the update and boot logic of the bootloader
-    pub fn boot(&mut self) -> Result<void::Void, STATE::Error> {
+    pub fn boot(&mut self) -> Result<void::Void, <CONTEXT::State as State>::Error> {
         // TODO: consider error handling
         log::info!("Booting with moonboot!");
 
@@ -116,19 +102,20 @@ impl<
 
     // Handle a case of power interruption or similar, which lead to a exchange_banks being
     // interrupted.
-    fn handle_exchanging(&mut self, progress: ExchangeProgress) -> Result<Update, STATE::Error> {
+    fn handle_exchanging(
+        &mut self,
+        progress: ExchangeProgress,
+    ) -> Result<Update, <CONTEXT::State as State>::Error> {
         log::error!(
             "Firmware Update was interrupted! Trying to recover with exchange operation: {:?}",
             progress
         );
 
-        let exchange_result = self
-            .exchange
-            .exchange::<STORAGE, STATE, INTERNAL_PAGE_SIZE>(
-                &mut self.storage,
-                &mut self.state,
-                progress,
-            );
+        let exchange_result = self.exchange.exchange::<INTERNAL_PAGE_SIZE>(
+            &mut self.storage,
+            &mut self.state,
+            progress,
+        );
 
         Ok(if exchange_result.is_ok() {
             let state = self.state.read()?.update;
@@ -168,7 +155,17 @@ impl<
             );
 
             // Try to exchange the firmware images
-            let exchange_result = self.exchange_banks(new, old);
+            let exchange_result = self.exchange.exchange::<INTERNAL_PAGE_SIZE>(
+                &mut self.storage,
+                &mut self.state,
+                ExchangeProgress {
+                    a: new,
+                    b: old,
+                    page_index: 0,
+                    recovering: false,
+                    step: ExchangeStep::AToScratch,
+                },
+            );
             if exchange_result.is_ok() {
                 if with_failsafe_revert {
                     // Update Firmware Update State to revert. The Application will set this to
@@ -191,25 +188,6 @@ impl<
             log::error!("An invalid image index has been specified during update or revert!");
             Update::Error(UpdateError::InvalidImageIndex)
         }
-    }
-
-    fn exchange_banks(
-        &mut self,
-        a: Bank,
-        b: Bank,
-    ) -> Result<(), ExchangeError<STORAGE::Error, STATE::Error, EXCHANGE::OtherError>> {
-        self.exchange
-            .exchange::<STORAGE, STATE, INTERNAL_PAGE_SIZE>(
-                &mut self.storage,
-                &mut self.state,
-                ExchangeProgress {
-                    a,
-                    b,
-                    page_index: 0,
-                    recovering: false,
-                    step: ExchangeStep::AToScratch,
-                },
-            )
     }
 
     // Jump to the firmware image marked as bootable

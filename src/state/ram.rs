@@ -58,15 +58,37 @@ impl State for RamState {
     }
 }
 
-impl Exchange for RamState {
-    type OtherError = void::Void;
+pub enum ExchangeError<STORAGE, STATE> {
+    Storage(STORAGE),
+    State(STATE),
+}
 
-    fn exchange<STORAGE: Storage, STATE: State, const INTERNAL_PAGE_SIZE: usize>(
+impl<STORAGE, STATE> Debug for ExchangeError<STORAGE, STATE>
+where
+    STORAGE: Debug,
+    STATE: Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Storage(arg0) => f.debug_tuple("Storage").field(arg0).finish(),
+            Self::State(arg0) => f.debug_tuple("State").field(arg0).finish(),
+        }
+    }
+}
+
+impl<STORAGE: Storage, STATE: State> Exchange<STORAGE, STATE> for RamState
+where
+    STORAGE::Error: Debug,
+    STATE::Error: Debug,
+{
+    type Error = ExchangeError<STORAGE::Error, STATE::Error>;
+
+    fn exchange<const INTERNAL_PAGE_SIZE: usize>(
         &mut self,
         storage: &mut STORAGE,
         state: &mut STATE,
         progress: ExchangeProgress,
-    ) -> Result<(), ExchangeError<STORAGE::Error, STATE::Error, Self::OtherError>> {
+    ) -> Result<(), Self::Error> {
         let ExchangeProgress {
             a,
             b,
@@ -74,6 +96,10 @@ impl Exchange for RamState {
             step,
             ..
         } = progress;
+
+        assert_eq!(a.size, b.size);
+        assert_ne!(a.size, 0);
+        assert_ne!(b.size, 0);
 
         let size = a.size; // Both are equal
 

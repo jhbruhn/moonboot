@@ -1,24 +1,18 @@
 use crate::{
     hardware::{processor::Processor, Config},
     state::{State, Update},
+    Context,
 };
-
-use embedded_storage::Storage;
 
 use crate::log;
 
 /// Instantiate this in your application to enable mutation of the State specified in this and jump
 /// to the bootloader to apply any updates.
-pub struct MoonbootManager<
-    STORAGE: Storage,
-    STATE: State,
-    PROCESSOR: Processor,
-    const INTERNAL_PAGE_SIZE: usize,
-> {
+pub struct MoonbootManager<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> {
     config: Config,
-    storage: STORAGE,
-    state: STATE,
-    processor: PROCESSOR,
+    storage: CONTEXT::Storage,
+    state: CONTEXT::State,
+    processor: CONTEXT::Processor,
 }
 
 pub struct InitError;
@@ -28,21 +22,26 @@ pub enum MarkError<E> {
     State(E),
 }
 
-impl<STORAGE: Storage, STATE: State, PROCESSOR: Processor, const INTERNAL_PAGE_SIZE: usize>
-    MoonbootManager<STORAGE, STATE, PROCESSOR, INTERNAL_PAGE_SIZE>
+impl<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize>
+    MoonbootManager<CONTEXT, INTERNAL_PAGE_SIZE>
 {
     pub fn new(
         config: Config,
-        storage: STORAGE,
-        state: STATE,
-        processor: PROCESSOR,
-    ) -> Result<MoonbootManager<STORAGE, STATE, PROCESSOR, INTERNAL_PAGE_SIZE>, InitError> {
+        storage: CONTEXT::Storage,
+        state: CONTEXT::State,
+        processor: CONTEXT::Processor,
+    ) -> Result<Self, InitError> {
         if config.update_bank.size > config.boot_bank.size {
             log::error!(
                 "Requested update bank {:?} is larger than boot bank {:?}",
-                bank,
-                self.config.boot_bank
+                config.update_bank,
+                config.boot_bank
             );
+            return Err(InitError);
+        }
+
+        if config.update_bank.size == 0 || config.boot_bank.size == 0 {
+            log::error!("Requested banks are of zero size");
             return Err(InitError);
         }
 
@@ -55,14 +54,16 @@ impl<STORAGE: Storage, STATE: State, PROCESSOR: Processor, const INTERNAL_PAGE_S
     }
 
     /// Destroy this instance of the boot manager and return access to the hardware peripheral
-    pub fn destroy(self) -> (STORAGE, STATE, PROCESSOR) {
+    pub fn destroy(self) -> (CONTEXT::Storage, CONTEXT::State, CONTEXT::Processor) {
         (self.storage, self.state, self.processor)
     }
 
     /// Run this immediately after booting your new image successfully to mark the boot as
     /// succesful. If you do not do this, any reset will cause the bootloader to restore to the
     /// previous firmware image.
-    pub fn mark_boot_successful(&mut self) -> Result<(), MarkError<STATE::Error>> {
+    pub fn mark_boot_successful(
+        &mut self,
+    ) -> Result<(), MarkError<<CONTEXT::State as State>::Error>> {
         let mut current_state = self.state.read().map_err(MarkError::State)?;
 
         log::info!(
@@ -92,7 +93,7 @@ impl<STORAGE: Storage, STATE: State, PROCESSOR: Processor, const INTERNAL_PAGE_S
 
     // Upgrade firmware verifiying the given signature over the size of size.
     // Can only return an error or diverge (!, represented by Void while ! is not a type yet)
-    pub fn update(&mut self) -> Result<void::Void, STATE::Error> {
+    pub fn update(&mut self) -> Result<void::Void, <CONTEXT::State as State>::Error> {
         // Apply the update stored in the update bank
         let bank = self.config.update_bank;
 

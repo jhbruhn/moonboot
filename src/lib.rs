@@ -45,6 +45,13 @@ pub(crate) use defmt as log;
 #[cfg(feature = "use-log")]
 pub(crate) use logger_crate as log;
 
+pub trait Context {
+    type Storage: embedded_storage::Storage;
+    type State: state::State;
+    type Processor: hardware::processor::Processor;
+    type Exchange: state::Exchange<Self::Storage, Self::State>;
+}
+
 #[cfg(not(any(feature = "use-log", feature = "use-defmt")))]
 pub(crate) mod log {
     macro_rules! info {

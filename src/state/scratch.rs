@@ -1,11 +1,10 @@
-use core::ops::Range;
+use core::{fmt::Debug, ops::Range};
 
 use embedded_storage::Storage;
 
 use crate::{
     log,
-    state::{ExchangeProgress, ExchangeStep, State, Update},
-    swap::{MemoryError, Swap},
+    state::{Exchange, ExchangeProgress, ExchangeStep, State, Update},
     Address,
 };
 
@@ -13,29 +12,48 @@ pub struct Scratch<'a> {
     pub pages: &'a [Range<Address>],
 }
 
-impl<'a> Swap for Scratch<'a> {
-    fn exchange<InternalMemory: Storage, HardwareState: State, const INTERNAL_PAGE_SIZE: usize>(
+pub enum ExchangeError<STORAGE, STATE> {
+    Storage(STORAGE),
+    State(STATE),
+}
+
+impl<STORAGE, STATE> Debug for ExchangeError<STORAGE, STATE>
+where
+    STORAGE: Debug,
+    STATE: Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Storage(arg0) => f.debug_tuple("Storage").field(arg0).finish(),
+            Self::State(arg0) => f.debug_tuple("State").field(arg0).finish(),
+        }
+    }
+}
+
+impl<'a, STORAGE: Storage, STATE: State> Exchange<STORAGE, STATE> for Scratch<'a>
+where
+    STORAGE::Error: Debug,
+    STATE::Error: Debug,
+{
+    type Error = ExchangeError<STORAGE::Error, STATE::Error>;
+
+    fn exchange<const INTERNAL_PAGE_SIZE: usize>(
         &mut self,
-        internal_memory: &mut InternalMemory,
-        state: &mut HardwareState,
-        exchange: ExchangeProgress,
-    ) -> Result<(), MemoryError> {
+        storage: &mut STORAGE,
+        state: &mut STATE,
+        progress: ExchangeProgress,
+    ) -> Result<(), Self::Error> {
         let ExchangeProgress {
             a,
             b,
             page_index,
             mut step,
             ..
-        } = exchange;
+        } = progress;
 
-        // TODO: Sanity Check start_index
-        if a.size != b.size {
-            return Err(MemoryError::BankSizeNotEqual);
-        }
-
-        if a.size == 0 || b.size == 0 {
-            return Err(MemoryError::BankSizeZero);
-        }
+        assert_eq!(a.size, b.size);
+        assert_ne!(a.size, 0);
+        assert_ne!(b.size, 0);
 
         let size = a.size; // Both are equal
 
@@ -46,7 +64,7 @@ impl<'a> Swap for Scratch<'a> {
 
         let mut ram_buf = [0_u8; INTERNAL_PAGE_SIZE];
 
-        let mut last_state = state.read();
+        let mut last_state = state.read().map_err(ExchangeError::State)?;
 
         // Set this in the exchanging part to know whether we are in a recovery process from a
         // failed update or on the initial update
@@ -85,37 +103,35 @@ impl<'a> Swap for Scratch<'a> {
                         page_index,
                         step,
                     });
-                    state
-                        .write(&last_state)
-                        .map_err(|_| MemoryError::WriteFailure)?;
+                    state.write(&last_state).map_err(ExchangeError::State)?;
                 }
 
                 match step {
                     ExchangeStep::AToScratch => {
-                        internal_memory
+                        storage
                             .read(a_location, &mut ram_buf)
-                            .map_err(|_| MemoryError::ReadFailure)?;
-                        internal_memory
+                            .map_err(ExchangeError::Storage)?;
+                        storage
                             .write(scratch_location, &ram_buf)
-                            .map_err(|_| MemoryError::WriteFailure)?;
+                            .map_err(ExchangeError::Storage)?;
                         step = ExchangeStep::BToA;
                     }
                     ExchangeStep::BToA => {
-                        internal_memory
+                        storage
                             .read(b_location, &mut ram_buf)
-                            .map_err(|_| MemoryError::ReadFailure)?;
-                        internal_memory
+                            .map_err(ExchangeError::Storage)?;
+                        storage
                             .write(a_location, &ram_buf)
-                            .map_err(|_| MemoryError::WriteFailure)?;
+                            .map_err(ExchangeError::Storage)?;
                         step = ExchangeStep::ScratchToB;
                     }
                     ExchangeStep::ScratchToB => {
-                        internal_memory
+                        storage
                             .read(scratch_location, &mut ram_buf)
-                            .map_err(|_| MemoryError::ReadFailure)?;
-                        internal_memory
+                            .map_err(ExchangeError::Storage)?;
+                        storage
                             .write(b_location, &ram_buf)
-                            .map_err(|_| MemoryError::WriteFailure)?;
+                            .map_err(ExchangeError::Storage)?;
                         step = ExchangeStep::AToScratch;
                         break;
                     }
