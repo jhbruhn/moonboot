@@ -1,7 +1,7 @@
 use crate::{
     hardware::processor::Processor,
     hardware::{Bank, Config},
-    state::{Exchange, ExchangeProgress, ExchangeStep, MemoryError, State, Update, UpdateError},
+    state::{Exchange, ExchangeError, ExchangeProgress, ExchangeStep, State, Update, UpdateError},
 };
 
 use embedded_storage::Storage;
@@ -58,13 +58,13 @@ impl<
     }
 
     /// Execute the update and boot logic of the bootloader
-    pub fn boot(&mut self) -> Result<void::Void, ()> {
+    pub fn boot(&mut self) -> Result<void::Void, STATE::Error> {
         // TODO: consider error handling
         log::info!("Booting with moonboot!");
 
         self.processor.setup(&self.config);
 
-        let mut state = self.state.read();
+        let mut state = self.state.read()?;
 
         log::info!("Old State: {:?}", state);
 
@@ -73,7 +73,7 @@ impl<
             Update::None => self.handle_none(),
             Update::Request(bank) => self.handle_request(bank),
             Update::Revert(bank) => self.handle_revert(bank),
-            Update::Exchanging(progress) => self.handle_exchanging(progress),
+            Update::Exchanging(progress) => self.handle_exchanging(progress)?,
             Update::Error(err) => Update::Error(err),
         };
 
@@ -116,7 +116,7 @@ impl<
 
     // Handle a case of power interruption or similar, which lead to a exchange_banks being
     // interrupted.
-    fn handle_exchanging(&mut self, progress: ExchangeProgress) -> Update {
+    fn handle_exchanging(&mut self, progress: ExchangeProgress) -> Result<Update, STATE::Error> {
         log::error!(
             "Firmware Update was interrupted! Trying to recover with exchange operation: {:?}",
             progress
@@ -130,8 +130,8 @@ impl<
                 progress,
             );
 
-        if exchange_result.is_ok() {
-            let state = self.state.read().update;
+        Ok(if exchange_result.is_ok() {
+            let state = self.state.read()?.update;
             match state {
                 Update::Exchanging(progress) => {
                     if progress.recovering {
@@ -148,7 +148,7 @@ impl<
                 exchange_result
             );
             Update::Error(UpdateError::ImageExchangeFailed)
-        }
+        })
     }
 
     // Revert the bootable image with the image in index new_firmware. Returns Revert on success if
@@ -193,7 +193,11 @@ impl<
         }
     }
 
-    fn exchange_banks(&mut self, a: Bank, b: Bank) -> Result<(), MemoryError> {
+    fn exchange_banks(
+        &mut self,
+        a: Bank,
+        b: Bank,
+    ) -> Result<(), ExchangeError<STORAGE::Error, STATE::Error, EXCHANGE::OtherError>> {
         self.exchange
             .exchange::<STORAGE, STATE, INTERNAL_PAGE_SIZE>(
                 &mut self.storage,

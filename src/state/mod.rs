@@ -6,24 +6,22 @@ pub mod scratch;
 
 use embedded_storage::Storage;
 
-/// Error occured during memory access
-#[cfg_attr(feature = "use-defmt", derive(Format))]
-#[derive(Debug)]
-pub enum MemoryError {
-    BankSizeNotEqual,
-    BankSizeZero,
-    ReadFailure,
-    WriteFailure,
+pub enum ExchangeError<STORAGE, STATE, OTHER> {
+    Storage(STORAGE),
+    State(STATE),
+    Other(OTHER),
 }
 
 /// Abstraction for the exchange operation of the current state.
 pub trait Exchange {
+    type OtherError;
+
     fn exchange<STORAGE: Storage, STATE: State, const INTERNAL_PAGE_SIZE: usize>(
         &mut self,
         internal_memory: &mut STORAGE,
         state: &mut STATE,
         progress: ExchangeProgress,
-    ) -> Result<(), MemoryError>;
+    ) -> Result<(), ExchangeError<STORAGE::Error, STATE::Error, Self::OtherError>>;
 }
 
 use crate::hardware::Bank;
@@ -139,10 +137,12 @@ pub struct MoonbootState {
 /// RAM. As long as you don't want to perform update download, power cycle the device, and then
 /// apply the update, storing it in volatile memory is fine.
 pub trait State {
+    type Error;
+
     /// Read the shared state
-    fn read(&mut self) -> MoonbootState;
+    fn read(&mut self) -> Result<MoonbootState, Self::Error>;
     /// Write the new state to the shared state
-    fn write(&mut self, data: &MoonbootState) -> Result<(), ()>;
+    fn write(&mut self, data: &MoonbootState) -> Result<(), Self::Error>;
 }
 
 /// Size of the serialized state
