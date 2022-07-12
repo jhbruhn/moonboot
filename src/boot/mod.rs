@@ -1,77 +1,57 @@
 use crate::{
+    exchange::Exchange,
     hardware::processor::Processor,
     hardware::{Bank, Config},
-    state::{ExchangeProgress, State, Update, UpdateError},
-    Address,
+    state::{ExchangeProgress, ExchangeStep, State, Update, UpdateError},
+    Context,
 };
-
-use embedded_storage::Storage;
 
 use crate::log;
 
 #[cfg(feature = "defmt")]
 use defmt::Format;
 
-
-/// Error occured during nemory access
-#[cfg_attr(feature = "use-defmt", derive(Format))]
-#[derive(Debug)]
-enum MemoryError {
-    BankSizeNotEqual,
-    BankSizeZero,
-    ReadFailure,
-    WriteFailure,
-}
-
 /// Use this from your bootloader application and call boot() to do the magic, reading the current
 /// state via the State type and then jumping to the new image using the Jumper specified
-pub struct MoonbootBoot<
-    InternalMemory: Storage,
-    HardwareState: State,
-    CPU: Processor, // TODO: Wrap these into a context struct like rubble?
-    const INTERNAL_PAGE_SIZE: usize,
-> {
+pub struct MoonbootBoot<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> {
     config: Config,
-    internal_memory: InternalMemory,
-    state: HardwareState,
-    processor: CPU,
+    storage: CONTEXT::Storage,
+    state: CONTEXT::State,
+    processor: CONTEXT::Processor,
+    exchange: CONTEXT::Exchange,
 }
 
-impl<
-        InternalMemory: Storage,
-        HardwareState: State,
-        CPU: Processor,
-        const INTERNAL_PAGE_SIZE: usize,
-    > MoonbootBoot<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE>
-{
+impl<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> MoonbootBoot<CONTEXT, INTERNAL_PAGE_SIZE> {
     /// create a new instance of the bootloader
     pub fn new(
         config: Config,
-        internal_memory: InternalMemory,
-        state: HardwareState,
-        processor: CPU,
-    ) -> MoonbootBoot<InternalMemory, HardwareState, CPU, INTERNAL_PAGE_SIZE> {
+        storage: CONTEXT::Storage,
+        state: CONTEXT::State,
+        processor: CONTEXT::Processor,
+        exchange: CONTEXT::Exchange,
+    ) -> Self {
         Self {
             config,
-            internal_memory,
+            storage,
             state,
             processor,
+            exchange,
         }
     }
 
     /// Destroy this instance of the bootloader and return access to the hardware peripheral
-    pub fn destroy(self) -> (InternalMemory, HardwareState, CPU) {
-        (self.internal_memory, self.state, self.processor)
+    pub fn destroy(self) -> (CONTEXT::Storage, CONTEXT::State, CONTEXT::Processor) {
+        (self.storage, self.state, self.processor)
     }
 
     /// Execute the update and boot logic of the bootloader
-    pub fn boot(&mut self) -> Result<void::Void, ()> {
+    pub fn boot(&mut self) -> Result<void::Void, <CONTEXT::State as State>::Error> {
         // TODO: consider error handling
         log::info!("Booting with moonboot!");
 
         self.processor.setup(&self.config);
 
-        let mut state = self.state.read();
+        let mut state = self.state.read()?;
 
         log::info!("Old State: {:?}", state);
 
@@ -80,16 +60,14 @@ impl<
             Update::None => self.handle_none(),
             Update::Request(bank) => self.handle_request(bank),
             Update::Revert(bank) => self.handle_revert(bank),
-            Update::Exchanging(progress) => self.handle_exchanging(progress),
+            Update::Exchanging(progress) => self.handle_exchanging(progress)?,
             Update::Error(err) => Update::Error(err),
         };
-
-        // TODO: Handle Progress Variable in state to recover from power loss
 
         log::info!("New State: {:?}", state);
 
         // Step 2: Update state of Bootloader
-        self.state.write(state)?;
+        self.state.write(&state)?;
 
         // Step 3: Jump to new or unchanged firmware
         self.jump_to_firmware();
@@ -125,17 +103,24 @@ impl<
 
     // Handle a case of power interruption or similar, which lead to a exchange_banks being
     // interrupted.
-    fn handle_exchanging(&mut self, progress: ExchangeProgress) -> Update {
+    fn handle_exchanging(
+        &mut self,
+        progress: ExchangeProgress,
+    ) -> Result<Update, <CONTEXT::State as State>::Error> {
         log::error!(
             "Firmware Update was interrupted! Trying to recover with exchange operation: {:?}",
             progress
         );
 
-        let exchange_result =
-            self.exchange_banks_with_start(progress.a, progress.b, progress.page_index);
+        let exchange_result = self.exchange.exchange::<INTERNAL_PAGE_SIZE>(
+            &self.config,
+            &mut self.storage,
+            &mut self.state,
+            progress,
+        );
 
-        if exchange_result.is_ok() {
-            let state = self.state.read().update;
+        Ok(if exchange_result.is_ok() {
+            let state = self.state.read()?.update;
             match state {
                 Update::Exchanging(progress) => {
                     if progress.recovering {
@@ -152,7 +137,7 @@ impl<
                 exchange_result
             );
             Update::Error(UpdateError::ImageExchangeFailed)
-        }
+        })
     }
 
     // Revert the bootable image with the image in index new_firmware. Returns Revert on success if
@@ -172,7 +157,18 @@ impl<
             );
 
             // Try to exchange the firmware images
-            let exchange_result = self.exchange_banks(new, old);
+            let exchange_result = self.exchange.exchange::<INTERNAL_PAGE_SIZE>(
+                &self.config,
+                &mut self.storage,
+                &mut self.state,
+                ExchangeProgress {
+                    a: new,
+                    b: old,
+                    page_index: 0,
+                    recovering: false,
+                    step: ExchangeStep::AToScratch,
+                },
+            );
             if exchange_result.is_ok() {
                 if with_failsafe_revert {
                     // Update Firmware Update State to revert. The Application will set this to
@@ -197,102 +193,6 @@ impl<
         }
     }
 
-    fn exchange_banks(&mut self, a: Bank, b: Bank) -> Result<(), MemoryError> {
-        self.exchange_banks_with_start(a, b, 0)
-    }
-
-    fn exchange_banks_with_start(
-        &mut self,
-        a: Bank,
-        b: Bank,
-        start_index: u32,
-    ) -> Result<(), MemoryError> {
-        // TODO: Sanity Check start_index
-        if a.size != b.size {
-            return Err(MemoryError::BankSizeNotEqual);
-        }
-
-        if a.size == 0 || b.size == 0 {
-            return Err(MemoryError::BankSizeZero);
-        }
-
-        let size = a.size; // Both are equal
-
-        let full_pages = size / INTERNAL_PAGE_SIZE as Address;
-        let remaining_page_length = size as usize % INTERNAL_PAGE_SIZE;
-
-        let mut page_a_buf = [0_u8; INTERNAL_PAGE_SIZE];
-        let mut page_b_buf = [0_u8; INTERNAL_PAGE_SIZE];
-        // can we reduce this to 1 buf and fancy operations?
-        // probably not with the read/write API.
-        // classic memory exchange problem :)
-
-        // Set this in the exchanging part to know whether we are in a recovery process from a
-        // failed update or on the initial update
-        let recovering = matches!(self.state.read().update, Update::Revert(_));
-
-        // TODO: Fix
-        let a_location = a.location;
-        let b_location = b.location;
-
-        for page_index in start_index..full_pages {
-            let offset = page_index * INTERNAL_PAGE_SIZE as u32;
-            log::trace!(
-                "Exchange: Page {}, from a ({}) to b ({})",
-                page_index,
-                a_location + offset,
-                b_location + offset
-            );
-            self.internal_memory
-                .read(a_location + offset, &mut page_a_buf)
-                .map_err(|_| MemoryError::ReadFailure)?;
-            self.internal_memory
-                .read(b_location + offset, &mut page_b_buf)
-                .map_err(|_| MemoryError::ReadFailure)?;
-            self.internal_memory
-                .write(a_location + offset, &page_b_buf)
-                .map_err(|_| MemoryError::WriteFailure)?;
-            self.internal_memory
-                .write(b_location + offset, &page_a_buf)
-                .map_err(|_| MemoryError::WriteFailure)?;
-
-            // Store the exchange progress
-            let mut state = self.state.read();
-            state.update = Update::Exchanging(ExchangeProgress {
-                a,
-                b,
-                recovering,
-                page_index,
-            });
-            // TODO: Ignore the error here?
-            let _ = self.state.write(state);
-        }
-        // TODO: Fit this into the while loop
-        if remaining_page_length > 0 {
-            let offset = full_pages * INTERNAL_PAGE_SIZE as u32;
-
-            self.internal_memory
-                .read(
-                    a.location + offset,
-                    &mut page_a_buf[0..remaining_page_length],
-                )
-                .map_err(|_| MemoryError::ReadFailure)?;
-            self.internal_memory
-                .read(
-                    b.location + offset,
-                    &mut page_b_buf[0..remaining_page_length],
-                )
-                .map_err(|_| MemoryError::ReadFailure)?;
-            self.internal_memory
-                .write(a.location + offset, &page_a_buf[0..remaining_page_length])
-                .map_err(|_| MemoryError::WriteFailure)?;
-            self.internal_memory
-                .write(b.location + offset, &page_b_buf[0..remaining_page_length])
-                .map_err(|_| MemoryError::WriteFailure)?;
-        }
-
-        Ok(())
-    }
     // Jump to the firmware image marked as bootable
     fn jump_to_firmware(&mut self) -> ! {
         let app_exec_image = self.config.boot_bank;

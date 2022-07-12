@@ -47,6 +47,8 @@ pub struct Config {
     pub update_bank: Bank,
     /// bank the bootloader is contained in, switching between banks
     pub bootloader_bank: Bank,
+    /// bank the pages are temporarily stored when using the `Scratch` exchange method
+    pub scratch_bank: Bank,
     // Initial Image is stored to this bank after first update, restore on failure
     // pub golden_bank: Bank,
     /// section of RAM of this device
