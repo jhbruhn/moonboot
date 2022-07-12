@@ -116,7 +116,7 @@ pub struct MoonbootState {
 /// RAM. As long as you don't want to perform update download, power cycle the device, and then
 /// apply the update, storing it in volatile memory is fine.
 pub trait State {
-    type Error;
+    type Error: Debug;
 
     /// Read the shared state
     fn read(&mut self) -> Result<MoonbootState, Self::Error>;

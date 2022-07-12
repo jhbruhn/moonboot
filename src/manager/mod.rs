@@ -15,9 +15,13 @@ pub struct MoonbootManager<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> {
     processor: CONTEXT::Processor,
 }
 
+#[cfg_attr(feature = "use-defmt", derive(Format))]
+#[derive(Debug)]
 pub struct InitError;
 
-pub enum MarkError<E> {
+#[cfg_attr(feature = "use-defmt", derive(Format))]
+#[derive(Debug)]
+pub enum MarkError<E: core::fmt::Debug> {
     UpdateQueuedButNotInstalled,
     State(E),
 }

@@ -2,6 +2,7 @@ use embedded_storage::Storage;
 
 use crate::{
     exchange::Exchange,
+    hardware::Config,
     log,
     state::{ExchangeProgress, State, Update},
     Address,
@@ -36,6 +37,7 @@ where
 
     fn exchange<const INTERNAL_PAGE_SIZE: usize>(
         &mut self,
+        _config: &Config,
         storage: &mut STORAGE,
         state: &mut STATE,
         progress: ExchangeProgress,

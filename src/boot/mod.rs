@@ -113,6 +113,7 @@ impl<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> MoonbootBoot<CONTEXT, IN
         );
 
         let exchange_result = self.exchange.exchange::<INTERNAL_PAGE_SIZE>(
+            &self.config,
             &mut self.storage,
             &mut self.state,
             progress,
@@ -157,6 +158,7 @@ impl<CONTEXT: Context, const INTERNAL_PAGE_SIZE: usize> MoonbootBoot<CONTEXT, IN
 
             // Try to exchange the firmware images
             let exchange_result = self.exchange.exchange::<INTERNAL_PAGE_SIZE>(
+                &self.config,
                 &mut self.storage,
                 &mut self.state,
                 ExchangeProgress {

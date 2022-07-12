@@ -1,21 +1,21 @@
-use core::{fmt::Debug, ops::Range};
+use core::fmt::Debug;
 
 use embedded_storage::Storage;
 
 use crate::{
     exchange::Exchange,
+    hardware::Config,
     log,
     state::{ExchangeProgress, ExchangeStep, State, Update},
     Address,
 };
 
-pub struct Scratch<'a> {
-    pub pages: &'a [Range<Address>],
-}
+pub struct Scratch;
 
 pub enum ExchangeError<STORAGE, STATE> {
     Storage(STORAGE),
     State(STATE),
+    ScratchInsufficient,
 }
 
 impl<STORAGE, STATE> Debug for ExchangeError<STORAGE, STATE>
@@ -27,11 +27,12 @@ where
         match self {
             Self::Storage(arg0) => f.debug_tuple("Storage").field(arg0).finish(),
             Self::State(arg0) => f.debug_tuple("State").field(arg0).finish(),
+            Self::ScratchInsufficient => f.write_str("ScratchInsufficient"),
         }
     }
 }
 
-impl<'a, STORAGE: Storage, STATE: State> Exchange<STORAGE, STATE> for Scratch<'a>
+impl<STORAGE: Storage, STATE: State> Exchange<STORAGE, STATE> for Scratch
 where
     STORAGE::Error: Debug,
     STATE::Error: Debug,
@@ -40,6 +41,7 @@ where
 
     fn exchange<const INTERNAL_PAGE_SIZE: usize>(
         &mut self,
+        config: &Config,
         storage: &mut STORAGE,
         state: &mut STATE,
         progress: ExchangeProgress,
@@ -55,6 +57,10 @@ where
         assert_eq!(a.size, b.size);
         assert_ne!(a.size, 0);
         assert_ne!(b.size, 0);
+
+        if config.scratch_bank.size < INTERNAL_PAGE_SIZE as u32 {
+            return Err(ExchangeError::ScratchInsufficient);
+        }
 
         let size = a.size; // Both are equal
 
@@ -74,6 +80,8 @@ where
         let a_location = a.location;
         let b_location = b.location;
 
+        let scratch_bank_pages = config.scratch_bank.size / INTERNAL_PAGE_SIZE as u32;
+
         let mut first = true;
         for page_index in page_index..full_pages {
             let offset = page_index * INTERNAL_PAGE_SIZE as u32;
@@ -81,8 +89,9 @@ where
             let a_location = a_location + offset;
             let b_location = b_location + offset;
 
-            let scratch_index = page_index as usize % self.pages.len();
-            let scratch_location = self.pages[scratch_index].start;
+            let scratch_index = page_index % scratch_bank_pages;
+            let scratch_offset = scratch_index * INTERNAL_PAGE_SIZE as u32;
+            let scratch_location = config.scratch_bank.location + scratch_offset;
 
             log::trace!(
                 "Exchange: Page {}, from a ({}) to b ({}) using scratch ({})",

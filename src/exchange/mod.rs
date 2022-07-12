@@ -2,7 +2,10 @@ pub mod ram;
 
 pub mod scratch;
 
-use crate::state::{ExchangeProgress, State};
+use crate::{
+    hardware::Config,
+    state::{ExchangeProgress, State},
+};
 use embedded_storage::Storage;
 
 /// Abstraction for the exchange operation of the current state.
@@ -11,6 +14,7 @@ pub trait Exchange<STORAGE: Storage, STATE: State> {
 
     fn exchange<const INTERNAL_PAGE_SIZE: usize>(
         &mut self,
+        config: &Config,
         storage: &mut STORAGE,
         state: &mut STATE,
         progress: ExchangeProgress,

@@ -35,7 +35,7 @@ pub mod cortex_m {
             }
         }
 
-        fn setup(&mut self, config: &crate::hardware::Config) {
+        fn setup(&mut self, _config: &crate::hardware::Config) {
             // Nothing to do!
         }
     }
