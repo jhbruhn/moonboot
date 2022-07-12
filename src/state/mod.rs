@@ -1,13 +1,9 @@
 #[cfg(feature = "ram-state")]
 pub mod ram;
 
-#[cfg(feature = "scratch-state")]
-pub mod scratch;
-
 use crate::hardware::Bank;
 
 use core::fmt::Debug;
-use embedded_storage::Storage;
 
 use crc::{Crc, CRC_32_CKSUM};
 #[cfg(feature = "defmt")]
@@ -16,18 +12,6 @@ use defmt::Format;
 use desse::{Desse, DesseSized};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-/// Abstraction for the exchange operation of the current state.
-pub trait Exchange<STORAGE: Storage, STATE: State> {
-    type Error: Debug;
-
-    fn exchange<const INTERNAL_PAGE_SIZE: usize>(
-        &mut self,
-        storage: &mut STORAGE,
-        state: &mut STATE,
-        progress: ExchangeProgress,
-    ) -> Result<(), Self::Error>;
-}
 
 /// Decision making states for the bootloader
 // TODO: Hash + Signature? Should be done on download I think! This way, the algorithms can be

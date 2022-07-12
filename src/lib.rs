@@ -20,6 +20,8 @@ mod manager;
 /// Implementations for use in the firmware
 pub use manager::MoonbootManager;
 
+/// Various processes for exchanging pages
+pub mod exchange;
 /// Common hardware abstractions and associated implementations
 pub mod hardware;
 /// Shared state management between firmware and bootloader
@@ -49,7 +51,7 @@ pub trait Context {
     type Storage: embedded_storage::Storage;
     type State: state::State;
     type Processor: hardware::processor::Processor;
-    type Exchange: state::Exchange<Self::Storage, Self::State>;
+    type Exchange: exchange::Exchange<Self::Storage, Self::State>;
 }
 
 #[cfg(not(any(feature = "use-log", feature = "use-defmt")))]

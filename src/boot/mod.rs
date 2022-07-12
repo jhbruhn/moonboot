@@ -1,7 +1,8 @@
 use crate::{
+    exchange::Exchange,
     hardware::processor::Processor,
     hardware::{Bank, Config},
-    state::{Exchange, ExchangeProgress, ExchangeStep, State, Update, UpdateError},
+    state::{ExchangeProgress, ExchangeStep, State, Update, UpdateError},
     Context,
 };
 

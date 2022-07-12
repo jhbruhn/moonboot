@@ -3,8 +3,9 @@ use core::{fmt::Debug, ops::Range};
 use embedded_storage::Storage;
 
 use crate::{
+    exchange::Exchange,
     log,
-    state::{Exchange, ExchangeProgress, ExchangeStep, State, Update},
+    state::{ExchangeProgress, ExchangeStep, State, Update},
     Address,
 };
 
